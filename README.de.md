@@ -10,6 +10,7 @@ Bilder und kurze Videos aus einer Beschreibung erzeugen – mit dem Modell, das 
 
 ## Was sie kann
 
+- **Wo:** KI → Bilder & Videos – seit 1.2.0 ohne eigenen Seitenleisten-Eintrag; die ganze Seite bleibt unter Erweiterungen → Öffnen
 - Bild oder Video aus einer Beschreibung, Format bzw. Seitenverhältnis und Länge wählbar
 - Nutzt den Anbieter des KI-Helfers: OpenAI, Google, Replicate, fal, Stable Diffusion WebUI oder Hostwerks eigene lokale Bild-KI
 - Monatsbudget je Anbieter – vor jeder Erzeugung geprüft

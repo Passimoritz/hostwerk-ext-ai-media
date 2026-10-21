@@ -1,3 +1,7 @@
+## 1.2.0
+
+- Lives where it belongs: AI → Images & videos – no own sidebar entry any more (Hostwerk 3.0+); the full page stays under Extensions → Open and can be pinned in the sidebar settings. / Steckt jetzt dort, wo sie hingehört: KI → Bilder & Videos – kein eigener Seitenleisten-Eintrag mehr (Hostwerk 3.0+); die ganze Seite bleibt unter Erweiterungen → Öffnen und lässt sich in den Seitenleisten-Einstellungen anheften.
+
 ## 1.1.0
 
 - The new result opens reliably: the library is reloaded and the result opened by its id (no more guessing with a delay). / Das neue Ergebnis öffnet sich zuverlässig: Mediathek neu laden und das Ergebnis über seine ID öffnen (kein Raten mit Verzögerung mehr).

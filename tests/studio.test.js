@@ -69,7 +69,8 @@ test('video: seconds limited, starting picture needs a model that can do it', as
 test('activate registers the routes', () => {
   const routes = [];
   ext.activate({ ...world().host, router: new Proxy({}, { get: (_, m) => (p) => routes.push(`${m.toUpperCase()} ${p}`) }) });
-  assert.deepStrictEqual(routes, ['GET /ai-media', 'POST /ai-media/create']);
+  assert.deepStrictEqual(routes.slice(0, 2), ['GET /ai-media', 'POST /ai-media/create']);
+  assert.ok(['GET /ai-media/prompts', 'PUT /ai-media/library', 'POST /ai-media/to-project'].every((x) => routes.includes(x)));
 });
 
 test('every German text has a value', () => {

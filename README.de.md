@@ -13,7 +13,9 @@ Bilder und kurze Videos aus einer Beschreibung erzeugen – mit dem Modell, das 
 - Bild oder Video aus einer Beschreibung, Format bzw. Seitenverhältnis und Länge wählbar
 - Nutzt den Anbieter des KI-Helfers: OpenAI, Google, Replicate, fal, Stable Diffusion WebUI oder Hostwerks eigene lokale Bild-KI
 - Monatsbudget je Anbieter – vor jeder Erzeugung geprüft
-- Mediathek: suchen, herunterladen, löschen, ein Bild als Ausgangspunkt für Bearbeitung oder Video nutzen
+- Mehrere Varianten auf einmal, letzte Beschreibungen und eigene Vorlagen; Videos auch quadratisch, Preis passend zur Länge; Abbrechen
+- Mediathek: suchen, Favoriten, Ordner, mehrere auf einmal auswählen, herunterladen, löschen, ein Bild als Ausgangspunkt für Bearbeitung oder Video nutzen
+- Ein Bild als Symbol eines Minecraft-Servers setzen (64×64) oder in ein Projekt speichern – unverändert, als Favicon oder als Link-Vorschau
 - Alles steht auch dem KI-Chat zur Verfügung (Mediathek-ID)
 
 ## Installieren

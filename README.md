@@ -13,7 +13,9 @@ Create pictures and short videos from a description – with the model you chose
 - Image or video from a description, size or aspect ratio and length to choose
 - Uses the provider of the AI helper: OpenAI, Google, Replicate, fal, Stable Diffusion WebUI or Hostwerk’s own local image AI
 - Monthly budget per provider – checked before every creation
-- Media library: search, download, delete, use a picture as the start for an edit or a video
+- Several variants at once, recent descriptions and own templates; square videos, price matching the length; cancel
+- Media library: search, favourites, folders, select several at once, download, delete, use a picture as the start for an edit or a video
+- Set a picture as the icon of a Minecraft server (64×64) or save it into a project – as it is, as favicon or as link preview
 - Everything is also there for the AI chat (media ID)
 
 ## Install

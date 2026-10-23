@@ -4,6 +4,7 @@ import { get, post, put, del, useApi, waitJob, useStore, on, fmtBytes } from '@h
 import { Btn, Callout, Empty, Field, InfoTip, Loading, Modal, Progress, Seg, toast, confirmDialog, promptDialog } from '@hostwerk/ui';
 import { LazyImg, contextMenu } from '@hostwerk/kit';
 import { t } from '@hostwerk/i18n';
+import { useFill } from './fill';
 import './style.css';
 
 /*
@@ -202,6 +203,8 @@ function Preview({ m, lib, onClose, onDeleted, onUse, onFav }) {
 }
 
 export function StudioPage() {
+  // Erzeugen und Mediathek nebeneinander (ab ~1100 px), beide in der Fensterhöhe – die Mediathek scrollt in ihrer Fläche
+  const fill = useFill({ min: 300 });
   const st = useApi('/ai-media', [], { live: false });
   const libApi = useApi('/ai-media/library', [], { live: false, poll: false });
   const [kind, setKind] = useState('');
@@ -249,12 +252,13 @@ export function StudioPage() {
         <div><h1><Sparkles size={22} /> Image &amp; video studio</h1><p>Describe it – Hostwerk creates the picture or video with the model you chose in the AI helper. Everything lands in the media library.</p></div>
         <div className="actions">{spent > 0 && <span className="pill"><Coins size={13} /> {t('{cost} this month', { cost: euro(spent) })}</span>}<a className="btn ghost" href="#/ki/einstellungen"><Settings2 size={14} />{t('Models & budget')}</a></div>
       </div>
-      {!s.available ? <Callout kind="warn" dismissible={false}>The AI helper is not available on this machine – the studio needs it.</Callout> : <Composer st={s} from={from} clearFrom={() => setFrom(null)} onDone={opened} />}
-      <div className="card">
+      <div className="ams-split" ref={fill}>
+      <div className="ams-left">{!s.available ? <Callout kind="warn" dismissible={false}>The AI helper is not available on this machine – the studio needs it.</Callout> : <Composer st={s} from={from} clearFrom={() => setFrom(null)} onDone={opened} />}</div>
+      <div className="card ams-lib">
         <div className="card-head"><ImageIcon size={16} /><h3>Media library</h3><InfoTip>{t('Pictures and videos from the studio and from the AI chat. Use one as the start for the next, or name its ID in the chat.')}</InfoTip>
           <div className="right row-tight"><Seg value={kind} onChange={setKind} options={[{ id: '', label: t('All') }, { id: 'image', label: t('Images'), icon: ImageIcon }, { id: 'video', label: t('Videos'), icon: Film }]} /></div>
         </div>
-        <div className="card-body stack ams-body">
+        <div className="card-body stack ams-body ams-lib-body">
           <div className="row-tight ams-libbar">
             <div className="input-icon grow"><Search /><input className="input sm" aria-label={t('Search by description')} placeholder="Search by description …" value={q} onChange={(e) => setQ(e.target.value)} /></div>
             <select className="select sm" aria-label="Folder" value={folder} onChange={(e) => setFolder(e.target.value)}>
@@ -297,7 +301,8 @@ export function StudioPage() {
           )}
         </div>
       </div>
-      {sel && <Preview m={sel} lib={lib} onFav={fav} onClose={() => setSel(null)} onDeleted={(gone) => { setSel(null); list.reload(); post('/ai-media/library/forget', { ids: gone }).then((l) => libApi.setData(l)).catch(() => {}); }} onUse={(m) => { setFrom(m); setSel(null); window.scrollTo({ top: 0, behavior: 'smooth' }); }} />}
+      </div>
+      {sel && <Preview m={sel} lib={lib} onFav={fav} onClose={() => setSel(null)} onDeleted={(gone) => { setSel(null); list.reload(); post('/ai-media/library/forget', { ids: gone }).then((l) => libApi.setData(l)).catch(() => {}); }} onUse={(m) => { setFrom(m); setSel(null); window.scrollTo({ top: 0, behavior: 'smooth' }); const c = document.querySelector('.ams-left'); if (c) c.scrollTo({ top: 0, behavior: 'smooth' }); }} />}
     </div>
   );
 }

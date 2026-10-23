@@ -1,3 +1,7 @@
+## 1.3.0
+
+- Create and media library side by side (from about 1,100 pixels), both in the window height – the library scrolls inside / Erzeugen und Mediathek nebeneinander (ab etwa 1 100 Pixeln), beide in Fensterhöhe – die Mediathek scrollt in sich
+
 ## 1.2.0
 
 - Lives where it belongs: AI → Images & videos – no own sidebar entry any more (Hostwerk 3.0+); the full page stays under Extensions → Open and can be pinned in the sidebar settings. / Steckt jetzt dort, wo sie hingehört: KI → Bilder & Videos – kein eigener Seitenleisten-Eintrag mehr (Hostwerk 3.0+); die ganze Seite bleibt unter Erweiterungen → Öffnen und lässt sich in den Seitenleisten-Einstellungen anheften.

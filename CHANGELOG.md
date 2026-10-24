@@ -1,3 +1,7 @@
+## 1.3.1
+
+- New animated icon and banner in the common Hostwerk style (isometric block). / Neues animiertes Symbol und Banner im gemeinsamen Hostwerk-Stil (isometrischer Block).
+
 ## 1.3.0
 
 - Create and media library side by side (from about 1,100 pixels), both in the window height – the library scrolls inside / Erzeugen und Mediathek nebeneinander (ab etwa 1 100 Pixeln), beide in Fensterhöhe – die Mediathek scrollt in sich

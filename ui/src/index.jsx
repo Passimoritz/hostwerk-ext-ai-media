@@ -101,7 +101,7 @@ function Composer({ st, onDone, from, clearFrom }) {
       <div className="card-body stack ams-body">
         {!ready ? (
           <Callout kind="info" icon={Settings2} title={kind === 'video' ? t('No video model chosen yet') : t('No image model chosen yet')} dismissible={false}>
-            {cfg && cfg.pending ? t('“{label}” still has to be downloaded ({gb} GB).', { label: cfg.pending.label, gb: cfg.pending.gb }) : t('Choose a provider or Hostwerk’s own local image AI in the AI helper – the studio uses the same choice.')} <a className="btn sm ams-gap" href="#/ki/einstellungen">{t('Open AI settings')}</a>
+            {cfg && cfg.pending ? t('“{label}” still has to be downloaded ({gb} GB).', { label: cfg.pending.label, gb: cfg.pending.gb }) : t('Choose a provider or Hostwerk’s own local image AI in the AI helper – the studio uses the same choice.')} <a className="btn sm ams-gap" href="#/ki/einstellungen/medien">{t('Open AI settings')}</a>
           </Callout>
         ) : (
           <div className="ams-model small muted">{cfg.local ? <Cpu size={13} /> : <Cloud size={13} />} {cfg.label}{cfg.audio ? ` · ${t('with sound')}` : ''} · {price ? t('about {cost}', { cost: euro(price) }) : t('free')}{kind === 'video' && cfg.perSecond ? ` ${t('({cost} per second)', { cost: euro(cfg.perSecond) })}` : ''}</div>
@@ -250,7 +250,7 @@ export function StudioPage() {
     <div className="page fade-in">
       <div className="page-head">
         <div><h1><Sparkles size={22} /> Image &amp; video studio</h1><p>Describe it – Hostwerk creates the picture or video with the model you chose in the AI helper. Everything lands in the media library.</p></div>
-        <div className="actions">{spent > 0 && <span className="pill"><Coins size={13} /> {t('{cost} this month', { cost: euro(spent) })}</span>}<a className="btn ghost" href="#/ki/einstellungen"><Settings2 size={14} />{t('Models & budget')}</a></div>
+        <div className="actions">{spent > 0 && <span className="pill"><Coins size={13} /> {t('{cost} this month', { cost: euro(spent) })}</span>}<a className="btn ghost" href="#/ki/einstellungen/medien"><Settings2 size={14} />{t('Models & budget')}</a></div>
       </div>
       <div className="ams-split" ref={fill}>
       <div className="ams-left">{!s.available ? <Callout kind="warn" dismissible={false}>The AI helper is not available on this machine – the studio needs it.</Callout> : <Composer st={s} from={from} clearFrom={() => setFrom(null)} onDone={opened} />}</div>

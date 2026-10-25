@@ -4,7 +4,7 @@
 
 Bilder und kurze Videos aus einer Beschreibung erzeugen – mit dem Modell, das du im KI-Helfer gewählt hast. Mit Monatsbudget und Mediathek.
 
-[English](README.md) · Offizielle [Hostwerk](https://github.com/Passimoritz/hostwerk-public)-Erweiterung (SDK 2.7, native Erweiterung)
+[English](README.md) · Offizielle [Hostwerk](https://github.com/Passimoritz/hostwerk-public)-Erweiterung (native Erweiterung, ab Hostwerk 2.9)
 
 ![Bildschirmfoto](docs/screenshot.de.png)
 

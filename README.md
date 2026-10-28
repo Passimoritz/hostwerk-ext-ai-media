@@ -10,7 +10,7 @@ Create pictures and short videos from a description – with the model you chose
 
 ## What it does
 
-- **Where:** AI → Images & videos – no own sidebar entry since 1.2.0; the full page stays under Extensions → Open
+- **Where:** AI → Media (since 1.4.0 with Hostwerk SDK 3.10: create tools above Hostwerk’s media library; older Hostwerk versions: tab AI → Images & videos) – no own sidebar entry; the full page stays under Extensions → Open
 - Image or video from a description, size or aspect ratio and length to choose
 - Uses the provider of the AI helper: OpenAI, Google, Replicate, fal, Stable Diffusion WebUI or Hostwerk’s own local image AI
 - Monthly budget per provider – checked before every creation

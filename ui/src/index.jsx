@@ -307,11 +307,34 @@ export function StudioPage() {
   );
 }
 
+/**
+ * Only the create tools – for AI → Media in Hostwerk with SDK 3.10 (place "ai.media"): the one media library below is
+ * Hostwerk's own, so results land there. onCreated (from Hostwerk's media tab) reloads that library.
+ */
+export function CreateTools({ onCreated }) {
+  const st = useApi('/ai-media', [], { live: false });
+  if (!st.data && st.error) return <Empty icon={CloudOff} title="Could not load the studio" text={st.error} action={<Btn icon={RotateCw} onClick={() => st.reload()}>Try again</Btn>} />;
+  if (!st.data) return <Loading />;
+  const s = st.data;
+  const spent = s.costs ? Object.values(s.costs.spent || {}).reduce((a, b) => a + b, 0) : 0;
+  if (!s.available) return <Callout kind="warn" dismissible={false}>The AI helper is not available on this machine – the studio needs it.</Callout>;
+  return (
+    <div className="stack ams-section">
+      <Composer st={s} from={null} clearFrom={() => {}} onDone={(r) => { st.reload({ silent: true }); if (typeof onCreated === 'function') onCreated(r); }} />
+      {spent > 0 && <div className="small muted"><Coins size={13} /> {t('{cost} this month', { cost: euro(spent) })}</div>}
+    </div>
+  );
+}
+
 export default {
   pages: { main: StudioPage },
+  // Hostwerk with SDK 3.10: the create tools in AI → Media, above Hostwerk's one media library
+  sections: {
+    'ai.media': [{ id: 'studio', title: 'Images & videos', icon: ImageIcon, Component: CreateTools, order: 10 }],
+  },
   slots: {
-    // Seit Hostwerk 3.0 (SDK 3.2) ohne eigenen Seitenleisten-Eintrag ("nav": false) – die ganze Seite als Reiter im passenden Bereich;
-    // Hostwerk blendet dabei ihren Titel aus (Reiter + Herkunftszeile sagen schon, was es ist), die Knöpfe bleiben
-    'ai.tabs': [{ id: 'media', title: 'Images & videos', icon: ImageIcon, Component: StudioPage, order: 40 }],
+    // Older Hostwerk (before SDK 3.10): the whole studio as a tab in the AI area. fallback: true – Hostwerk 3.10 and newer
+    // leave it out (the section above is there), older versions ignore the flag and show the tab as before.
+    'ai.tabs': [{ id: 'media', title: 'Images & videos', icon: ImageIcon, Component: StudioPage, order: 40, fallback: true }],
   },
 };

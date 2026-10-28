@@ -1,3 +1,7 @@
+## 1.4.0
+
+- One media library: in Hostwerk with SDK 3.10 the studio brings only its create tools to AI → Media (place `ai.media`) – results land in Hostwerk’s own media library below; models and budget are set in AI → Settings → Sources. Older Hostwerk versions keep the full “Images & videos” tab (`fallback: true`). The full studio stays under Extensions → Open. / Eine Mediathek: In Hostwerk mit SDK 3.10 bringt das Studio nur noch seine Erzeugen-Werkzeuge nach KI → Medien (Platz `ai.media`) – Ergebnisse landen in Hostwerks eigener Mediathek darunter; Modelle und Budget stehen in KI → Einstellungen → Quellen. Ältere Hostwerk-Versionen behalten den ganzen Reiter „Bilder & Videos“ (`fallback: true`). Das ganze Studio bleibt unter Erweiterungen → Öffnen.
+
 ## 1.3.1
 
 - New animated icon and banner in the common Hostwerk style (isometric block). / Neues animiertes Symbol und Banner im gemeinsamen Hostwerk-Stil (isometrischer Block).

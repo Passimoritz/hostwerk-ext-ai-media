@@ -1,4 +1,11 @@
 {
+  "size {size}": "Größe {size}",
+  "format {aspect}": "Format {aspect}",
+  "{s} seconds": "{s} Sekunden",
+  "Make a video": "Mach ein Video",
+  "Make an image": "Mach ein Bild",
+  "Make {n} variants": "Mach {n} Varianten",
+  "Create in the conversation": "Im Gespräch erzeugen",
   "Create": "Erzeugen",
   "Delete": "Löschen",
   "Use as a start": "Als Ausgangspunkt nutzen",

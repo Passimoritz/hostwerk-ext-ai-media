@@ -66,7 +66,8 @@ function PromptMemory({ kind, prompt, setPrompt }) {
   );
 }
 
-function Composer({ st, onDone, from, clearFrom }) {
+/** toChat (Hostwerk 3.10, Mediathek neben dem Gespräch): die Bitte geht ins Gespräch statt in einen eigenen Auftrag. */
+function Composer({ st, onDone, from, clearFrom, toChat = null }) {
   const [kind, setKind] = useState('image');
   const [prompt, setPrompt] = useState('');
   const [size, setSize] = useState('');
@@ -80,7 +81,17 @@ function Composer({ st, onDone, from, clearFrom }) {
   // Price for what is chosen: videos per second × length, pictures × variants
   const secs = Number(seconds) || (cfg && cfg.seconds) || 8;
   const price = !ready ? 0 : kind === 'video' ? (cfg.perSecond ? cfg.perSecond * secs : cfg.estimate) : cfg.estimate * variants;
+  // Bitte in Worten, wie man sie der KI schreiben würde – das Gespräch erzeugt mit denselben Einstellungen
+  const ask = () => {
+    const opts = [];
+    if (kind === 'image' && size) opts.push(t('size {size}', { size }));
+    if (kind === 'video' && aspect) opts.push(t('format {aspect}', { aspect }));
+    if (kind === 'video' && seconds) opts.push(t('{s} seconds', { s: seconds }));
+    const head = kind === 'video' ? t('Make a video') : variants > 1 ? t('Make {n} variants', { n: variants }) : t('Make an image');
+    return `${head}${opts.length ? ` (${opts.join(', ')})` : ''}: ${prompt.trim()}`;
+  };
   const create = async () => {
+    if (typeof toChat === 'function') { toChat(ask()); setPrompt(''); return; }
     try {
       const r = await post('/ai-media/create', { kind, prompt, size: size || undefined, aspect: aspect || undefined, seconds: seconds || undefined, from: from ? from.id : undefined, variants: kind === 'image' ? variants : 1 });
       setJob(r.job);
@@ -118,7 +129,7 @@ function Composer({ st, onDone, from, clearFrom }) {
           {kind === 'video' && <label className="small row-tight">{t('Seconds')} <input className="input sm ams-secs" type="number" min={1} max={(cfg && cfg.maxSeconds) || 20} value={seconds} placeholder={String((cfg && cfg.seconds) || 8)} onChange={(e) => setSeconds(e.target.value)} /></label>}
           <span className="grow" />
           {job ? <Btn className="danger" icon={Square} onClick={cancel}>Cancel</Btn> : null}
-          <Btn className="primary" icon={Sparkles} busy={!!job} disabled={!ready || prompt.trim().length < 3} onClick={create}>{kind === 'video' ? t('Create video') : variants > 1 ? t('Create {n} images', { n: variants }) : t('Create image')}</Btn>
+          <Btn className="primary" icon={Sparkles} busy={!!job} disabled={!ready || prompt.trim().length < 3} onClick={create}>{toChat ? t('Create in the conversation') : kind === 'video' ? t('Create video') : variants > 1 ? t('Create {n} images', { n: variants }) : t('Create image')}</Btn>
         </div>
         {running && <div><div className="small muted ams-run-text">{running.text}</div><Progress value={running.progress} indeterminate={!running.progress || running.progress < 10} /></div>}
       </div>
@@ -309,9 +320,10 @@ export function StudioPage() {
 
 /**
  * Only the create tools – for AI → Media in Hostwerk with SDK 3.10 (place "ai.media"): the one media library below is
- * Hostwerk's own, so results land there. onCreated (from Hostwerk's media tab) reloads that library.
+ * Hostwerk's own, so results land there. onCreated (from Hostwerk's media tab) reloads that library. toChat (Hostwerk 3.10
+ * with the library next to a conversation): the request goes into that conversation, which creates it with its own tools.
  */
-export function CreateTools({ onCreated }) {
+export function CreateTools({ onCreated, toChat }) {
   const st = useApi('/ai-media', [], { live: false });
   if (!st.data && st.error) return <Empty icon={CloudOff} title="Could not load the studio" text={st.error} action={<Btn icon={RotateCw} onClick={() => st.reload()}>Try again</Btn>} />;
   if (!st.data) return <Loading />;
@@ -320,7 +332,7 @@ export function CreateTools({ onCreated }) {
   if (!s.available) return <Callout kind="warn" dismissible={false}>The AI helper is not available on this machine – the studio needs it.</Callout>;
   return (
     <div className="stack ams-section">
-      <Composer st={s} from={null} clearFrom={() => {}} onDone={(r) => { st.reload({ silent: true }); if (typeof onCreated === 'function') onCreated(r); }} />
+      <Composer st={s} from={null} clearFrom={() => {}} toChat={toChat} onDone={(r) => { st.reload({ silent: true }); if (typeof onCreated === 'function') onCreated(r); }} />
       {spent > 0 && <div className="small muted"><Coins size={13} /> {t('{cost} this month', { cost: euro(spent) })}</div>}
     </div>
   );

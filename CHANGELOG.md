@@ -1,6 +1,7 @@
 ## 1.4.0
 
 - One media library: in Hostwerk with SDK 3.10 the studio brings only its create tools to AI → Media (place `ai.media`) – results land in Hostwerk’s own media library below; models and budget are set in AI → Settings → Sources. Older Hostwerk versions keep the full “Images & videos” tab (`fallback: true`). The full studio stays under Extensions → Open. / Eine Mediathek: In Hostwerk mit SDK 3.10 bringt das Studio nur noch seine Erzeugen-Werkzeuge nach KI → Medien (Platz `ai.media`) – Ergebnisse landen in Hostwerks eigener Mediathek darunter; Modelle und Budget stehen in KI → Einstellungen → Quellen. Ältere Hostwerk-Versionen behalten den ganzen Reiter „Bilder & Videos“ (`fallback: true`). Das ganze Studio bleibt unter Erweiterungen → Öffnen.
+- Next to a conversation (Hostwerk’s media library beside the chat) “Create” sends the request into that conversation – size, format, length and variants included – and the conversation creates it with Hostwerk’s own tools. On its own, the studio creates as before. / Neben einem Gespräch (Mediathek als Leiste neben dem Chat) schickt „Erzeugen“ die Bitte ins Gespräch – samt Größe, Format, Länge und Varianten – und das Gespräch erzeugt mit Hostwerks eigenen Werkzeugen. Für sich allein erzeugt das Studio wie bisher.
 
 ## 1.3.1
 

@@ -1,5 +1,5 @@
-import { useEffect, useMemo, useState } from 'react';
-import { Sparkles, Image as ImageIcon, Film, Wand2, Download, Trash2, Search, Settings2, Copy, Coins, Cpu, Cloud, Square, Star, Folder, FolderInput, History, Bookmark, X, Box, FolderGit2, CheckSquare, RotateCw, CloudOff } from 'lucide-react';
+import { useEffect, useMemo, useRef, useState } from 'react';
+import { Sparkles, Image as ImageIcon, Film, Wand2, Download, Trash2, Search, Settings2, Copy, Coins, Cpu, Cloud, Square, Star, Folder, FolderInput, History, Bookmark, X, Box, FolderGit2, CheckSquare, RotateCw, CloudOff, Repeat, MoreHorizontal, Pencil, FolderMinus, ListChecks } from 'lucide-react';
 import { get, post, put, del, useApi, waitJob, useStore, on, fmtBytes } from '@hostwerk/api';
 import { Btn, Callout, Empty, Field, InfoTip, Loading, Modal, Progress, Seg, toast, confirmDialog, promptDialog } from '@hostwerk/ui';
 import { LazyImg, contextMenu } from '@hostwerk/kit';
@@ -67,7 +67,7 @@ function PromptMemory({ kind, prompt, setPrompt }) {
 }
 
 /** toChat (Hostwerk 3.10, Mediathek neben dem Gespräch): die Bitte geht ins Gespräch statt in einen eigenen Auftrag. */
-function Composer({ st, onDone, from, clearFrom, toChat = null }) {
+function Composer({ st, onDone, from, clearFrom, toChat = null, apiRef = null }) {
   const [kind, setKind] = useState('image');
   const [prompt, setPrompt] = useState('');
   const [size, setSize] = useState('');
@@ -81,6 +81,8 @@ function Composer({ st, onDone, from, clearFrom, toChat = null }) {
   // Price for what is chosen: videos per second × length, pictures × variants
   const secs = Number(seconds) || (cfg && cfg.seconds) || 8;
   const price = !ready ? 0 : kind === 'video' ? (cfg.perSecond ? cfg.perSecond * secs : cfg.estimate) : cfg.estimate * variants;
+  // Startbild nur, wenn das gewählte Modell es kann (sonst lehnt der Server ab – lieber gleich sagen, warum)
+  const fromOk = !from || !ready || (kind === 'video' ? cfg.i2v : cfg.edit);
   // Bitte in Worten, wie man sie der KI schreiben würde – das Gespräch erzeugt mit denselben Einstellungen
   const ask = () => {
     const opts = [];
@@ -90,20 +92,29 @@ function Composer({ st, onDone, from, clearFrom, toChat = null }) {
     const head = kind === 'video' ? t('Make a video') : variants > 1 ? t('Make {n} variants', { n: variants }) : t('Make an image');
     return `${head}${opts.length ? ` (${opts.join(', ')})` : ''}: ${prompt.trim()}`;
   };
-  const create = async () => {
-    if (typeof toChat === 'function') { toChat(ask()); setPrompt(''); return; }
+  // again = { kind, prompt }: „Mit gleicher Beschreibung neu erzeugen“ aus der Vorschau (ein Stück, ohne Startbild)
+  const create = async (again) => {
+    const ov = again && typeof again.prompt === 'string' ? again : null;
+    const k = ov ? ov.kind : kind;
+    if (typeof toChat === 'function' && !ov) { toChat(ask()); setPrompt(''); return; }
     try {
-      const r = await post('/ai-media/create', { kind, prompt, size: size || undefined, aspect: aspect || undefined, seconds: seconds || undefined, from: from ? from.id : undefined, variants: kind === 'image' ? variants : 1 });
+      const r = await post('/ai-media/create', { kind: k, prompt: ov ? ov.prompt : prompt, size: size || undefined, aspect: aspect || undefined, seconds: seconds || undefined, from: !ov && from ? from.id : undefined, variants: k === 'image' && !ov ? variants : 1 });
       setJob(r.job);
       const j = await waitJob(r.job);
       const res = j && j.result;
-      toast.success(kind === 'video' ? t('Video created') : res && res.ids && res.ids.length > 1 ? t('{n} images created', { n: res.ids.length }) : t('Image created'));
-      clearFrom();
+      toast.success(k === 'video' ? t('Video created') : res && res.ids && res.ids.length > 1 ? t('{n} images created', { n: res.ids.length }) : t('Image created'));
+      if (!ov) clearFrom();
       onDone(res);
     } catch (e) { if (e && e.cancelled) toast('Cancelled – nothing was kept.'); else toast.error(e.message || e); }
     setJob(null);
   };
   const cancel = async () => { if (!job) return; try { await post(`/jobs/${encodeURIComponent(job)}/cancel`); } catch (e) { toast.error(e); } };
+  // Für die Vorschau: dieselbe Beschreibung noch einmal erzeugen (Art und Text stehen danach auch im Formular)
+  useEffect(() => {
+    if (!apiRef) return undefined;
+    apiRef.current = { busy: !!job, again: (m) => { if (job) { toast(t('Another job is still running – wait until it is done.')); return; } setKind(m.kind); setPrompt(m.prompt); create({ kind: m.kind, prompt: m.prompt }); } };
+    return () => { apiRef.current = null; };
+  });
   return (
     <div className="card ams-composer">
       <div className="card-head"><Wand2 size={16} /><h3>Create</h3>
@@ -115,11 +126,12 @@ function Composer({ st, onDone, from, clearFrom, toChat = null }) {
             {cfg && cfg.pending ? t('“{label}” still has to be downloaded ({gb} GB).', { label: cfg.pending.label, gb: cfg.pending.gb }) : t('Choose a provider or Hostwerk’s own local image AI in the AI helper – the studio uses the same choice.')} <a className="btn sm ams-gap" href="#/ki/einstellungen/medien">{t('Open AI settings')}</a>
           </Callout>
         ) : (
-          <div className="ams-model small muted">{cfg.local ? <Cpu size={13} /> : <Cloud size={13} />} {cfg.label}{cfg.audio ? ` · ${t('with sound')}` : ''} · {price ? t('about {cost}', { cost: euro(price) }) : t('free')}{kind === 'video' && cfg.perSecond ? ` ${t('({cost} per second)', { cost: euro(cfg.perSecond) })}` : ''}</div>
+          <div className="ams-model small muted">{cfg.local ? <Cpu size={13} /> : <Cloud size={13} />} {cfg.label}{cfg.audio ? ` · ${t('with sound')}` : ''} · {price ? euro(price) /* euro() schreibt schon ≈ davor – kein doppeltes „etwa ≈“ */ : t('free')}{kind === 'video' && cfg.perSecond ? ` ${t('({cost} per second)', { cost: euro(cfg.perSecond) })}` : ''}</div>
         )}
-        {from && <div className="ams-from"><img src={src(from)} alt="" /><span className="small grow">{kind === 'video' ? t('Starts from this picture') : t('Changes this picture')}</span><button type="button" className="btn ghost xs" onClick={clearFrom}>{t('Remove')}</button></div>}
+        {from && <div className="ams-from"><img src={src(from)} alt="" /><span className={`small grow ${fromOk ? '' : 'ams-from-no'}`}>{!fromOk ? (kind === 'video' ? t('The chosen video model cannot start from a picture.') : t('The chosen image model cannot edit pictures.')) : kind === 'video' ? t('Starts from this picture') : t('Changes this picture')}</span><button type="button" className="btn ghost xs" onClick={clearFrom}>{t('Remove')}</button></div>}
         <Field label={kind === 'video' ? t('What should the video show?') : t('What should the picture show?')}>
-          <textarea className="input" rows={4} value={prompt} maxLength={4000} placeholder={t(IDEAS[kind === 'video' ? 2 : 0])} onChange={(e) => setPrompt(e.target.value)} onKeyDown={(e) => { if (e.key === 'Enter' && (e.ctrlKey || e.metaKey) && ready && prompt.trim().length > 2 && !job) create(); }} />
+          {/* hostwerk-allow: keys – Strg+Enter startet nur in diesem eigenen Beschreibungsfeld (wie der Knopf daneben), kein seitenweites Kürzel */}
+          <textarea className="input" rows={4} value={prompt} maxLength={4000} placeholder={t(IDEAS[kind === 'video' ? 2 : 0])} onChange={(e) => setPrompt(e.target.value)} onKeyDown={(e) => { if (e.key === 'Enter' && (e.ctrlKey || e.metaKey) && ready && fromOk && prompt.trim().length > 2 && !job) create(); }} />
         </Field>
         <PromptMemory kind={kind} prompt={prompt} setPrompt={setPrompt} />
         <div className="row ams-options">
@@ -129,7 +141,7 @@ function Composer({ st, onDone, from, clearFrom, toChat = null }) {
           {kind === 'video' && <label className="small row-tight">{t('Seconds')} <input className="input sm ams-secs" type="number" min={1} max={(cfg && cfg.maxSeconds) || 20} value={seconds} placeholder={String((cfg && cfg.seconds) || 8)} onChange={(e) => setSeconds(e.target.value)} /></label>}
           <span className="grow" />
           {job ? <Btn className="danger" icon={Square} onClick={cancel}>Cancel</Btn> : null}
-          <Btn className="primary" icon={Sparkles} busy={!!job} disabled={!ready || prompt.trim().length < 3} onClick={create}>{toChat ? t('Create in the conversation') : kind === 'video' ? t('Create video') : variants > 1 ? t('Create {n} images', { n: variants }) : t('Create image')}</Btn>
+          <Btn className="primary" icon={Sparkles} busy={!!job} disabled={!ready || !fromOk || prompt.trim().length < 3} onClick={() => create()}>{toChat ? t('Create in the conversation') : kind === 'video' ? t('Create video') : variants > 1 ? t('Create {n} images', { n: variants }) : t('Create image')}</Btn>
         </div>
         {running && <div><div className="small muted ams-run-text">{running.text}</div><Progress value={running.progress} indeterminate={!running.progress || running.progress < 10} /></div>}
       </div>
@@ -192,14 +204,15 @@ function ToProject({ m }) {
   );
 }
 
-function Preview({ m, lib, onClose, onDeleted, onUse, onFav }) {
+function Preview({ m, lib, onClose, onDeleted, onUse, onFav, onAgain = null, againPrice = null }) {
   const fav = !!lib.fav[m.id];
   return (
     <Modal title={m.kind === 'video' ? t('Video') : t('Image')} subtitle={`${m.label || m.model} · ${when(m.t)} · ${fmtBytes(m.size)}${m.cost ? ` · ${euro(m.cost)}` : ''}`} size="wide" onClose={onClose}
       footer={<>
-        <Btn className="ghost" icon={Trash2} onClick={async () => { if (await confirmDialog({ title: t('Delete from the media library?'), confirm: t('Delete'), danger: true })) { await del(`/ai/media/${m.id}`); onDeleted([m.id]); } }}>Delete</Btn>
+        <Btn className="ghost" icon={Trash2} onClick={async () => { if (await confirmDialog({ title: t('Delete from the media library?'), confirm: t('Delete'), danger: true })) { try { await del(`/ai/media/${m.id}`); onDeleted([m.id]); } catch (e) { toast.error(e); } } }}>Delete</Btn>
         <Btn className="ghost" icon={Star} aria-pressed={fav} onClick={() => onFav([m.id], !fav)}>{fav ? 'Favourite' : 'Mark as favourite'}</Btn>
         <a className="btn" href={`${src(m)}?download=1`}><Download />{t('Download')}</a>
+        {onAgain && <Btn icon={Repeat} title={againPrice ? t('Same description, one more – {cost}', { cost: againPrice }) : t('Same description, one more')} onClick={() => onAgain(m)}>Create again</Btn>}
         {m.kind === 'image' && <Btn className="primary" icon={Wand2} onClick={() => onUse(m)}>Use as a start</Btn>}
       </>}>
       <div className="stack">
@@ -225,6 +238,7 @@ export function StudioPage() {
   const [sel, setSel] = useState(null);
   const [from, setFrom] = useState(null);
   const [picked, setPicked] = useState(null); // multi-select: Set of ids (null = off)
+  const composer = useRef(null);
   useEffect(() => on('ai-media', () => list.reload({ silent: true })), []); // eslint-disable-line react-hooks/exhaustive-deps
   const lib = libApi.data || { fav: {}, folder: {} };
   const folders = useMemo(() => [...new Set(Object.values(lib.folder))].sort((a, b) => a.localeCompare(b)), [lib.folder]);
@@ -237,14 +251,28 @@ export function StudioPage() {
   const setLib = async (body) => { try { libApi.setData(await put('/ai-media/library', body)); } catch (e) { toast.error(e); } };
   const fav = (ids, on2) => setLib({ ids, fav: on2 });
   const moveTo = async (ids) => {
-    const name = await promptDialog({ title: 'Move to folder', label: 'Folder (empty = no folder)', value: folders[0] || '', placeholder: 'e.g. Logos' });
+    // Vorbelegt mit dem Ordner, in dem das Stück schon liegt (nicht einfach dem ersten der Liste)
+    const name = await promptDialog({ title: 'Move to folder', label: 'Folder (empty = no folder)', value: (ids.length === 1 && lib.folder[ids[0]]) || (folder && folder !== '*' ? folder : '') || folders[0] || '', placeholder: 'e.g. Logos' });
     if (name === null || name === undefined) return;
     await setLib({ ids, folder: String(name).trim() || null });
   };
+  // Ordner-Menü: umbenennen oder auflösen (die Stücke bleiben, nur ohne Ordner)
+  const renameFolder = async () => {
+    const name = await promptDialog({ title: t('Rename folder “{name}”', { name: folder }), label: 'New name', value: folder, validate: (v) => (String(v || '').trim() ? null : t('Please enter a name.')) });
+    if (!name || String(name).trim() === folder) return;
+    try { libApi.setData(await post('/ai-media/library/folder', { from: folder, to: String(name).trim() })); setFolder(String(name).trim().slice(0, 40)); } catch (e) { toast.error(e); }
+  };
+  const dissolveFolder = async () => {
+    if (!(await confirmDialog({ title: t('Dissolve folder “{name}”?', { name: folder }), text: 'The pictures and videos stay in the media library – only without this folder.', confirm: 'Dissolve' }))) return;
+    try { libApi.setData(await post('/ai-media/library/folder', { from: folder, to: null })); setFolder(''); } catch (e) { toast.error(e); }
+  };
+  const folderMenu = (e) => contextMenu(e, [{ label: t('Rename folder …'), icon: Pencil, onClick: renameFolder }, { label: t('Dissolve folder'), icon: FolderMinus, onClick: dissolveFolder }]);
   const removeMany = async (ids) => {
     if (!(await confirmDialog({ title: t('Delete {n} items from the media library?', { n: ids.length }), confirm: t('Delete'), danger: true }))) return;
-    for (const id of ids) { try { await del(`/ai/media/${id}`); } catch (e) { toast.error(e); break; } }
-    try { libApi.setData(await post('/ai-media/library/forget', { ids })); } catch { /* order only */ }
+    // Nur wirklich Gelöschtes aus Favoriten/Ordnern nehmen (bricht das Löschen ab, behalten die übrigen ihre Ordnung)
+    const gone = [];
+    for (const id of ids) { try { await del(`/ai/media/${id}`); gone.push(id); } catch (e) { toast.error(e); break; } }
+    try { libApi.setData(await post('/ai-media/library/forget', { ids: gone })); } catch { /* order only */ }
     setPicked(null); list.reload();
   };
   // After creating: reload the library and open the (first) new result directly by its id
@@ -264,7 +292,7 @@ export function StudioPage() {
         <div className="actions">{spent > 0 && <span className="pill"><Coins size={13} /> {t('{cost} this month', { cost: euro(spent) })}</span>}<a className="btn ghost" href="#/ki/einstellungen/medien"><Settings2 size={14} />{t('Models & budget')}</a></div>
       </div>
       <div className="ams-split" ref={fill}>
-      <div className="ams-left">{!s.available ? <Callout kind="warn" dismissible={false}>The AI helper is not available on this machine – the studio needs it.</Callout> : <Composer st={s} from={from} clearFrom={() => setFrom(null)} onDone={opened} />}</div>
+      <div className="ams-left">{!s.available ? <Callout kind="warn" dismissible={false}>The AI helper is not available on this machine – the studio needs it.</Callout> : <Composer st={s} from={from} clearFrom={() => setFrom(null)} onDone={opened} apiRef={composer} />}</div>
       <div className="card ams-lib">
         <div className="card-head"><ImageIcon size={16} /><h3>Media library</h3><InfoTip>{t('Pictures and videos from the studio and from the AI chat. Use one as the start for the next, or name its ID in the chat.')}</InfoTip>
           <div className="right row-tight"><Seg value={kind} onChange={setKind} options={[{ id: '', label: t('All') }, { id: 'image', label: t('Images'), icon: ImageIcon }, { id: 'video', label: t('Videos'), icon: Film }]} /></div>
@@ -276,17 +304,19 @@ export function StudioPage() {
               <option value="">{t('All folders')}</option><option value="*">{t('Favourites')}</option>
               {folders.map((f) => <option key={f} value={f}>{f}</option>)}
             </select>
+            {folder && folder !== '*' && <Btn className="sm ghost icon" icon={MoreHorizontal} title={t('Folder “{name}” …', { name: folder })} aria-label={t('Folder “{name}” …', { name: folder })} onClick={folderMenu} />}
             <Btn className="sm ghost" icon={CheckSquare} aria-pressed={!!picked} onClick={() => setPicked(picked ? null : new Set())}>{picked ? 'Done' : 'Select'}</Btn>
           </div>
           {picked && (
             <div className="row-tight ams-pickbar">
               <span className="small grow">{t('{n} selected', { n: ids.length })}</span>
+              {items && items.length > 0 && <Btn className="sm ghost" icon={ListChecks} onClick={() => setPicked(items.every((m) => picked.has(m.id)) ? new Set() : new Set(items.map((m) => m.id)))}>{items.every((m) => picked.has(m.id)) ? 'Select none' : 'Select all'}</Btn>}
               <Btn className="sm ghost" icon={Star} disabled={!ids.length} onClick={() => fav(ids, true)}>Favourite</Btn>
               <Btn className="sm ghost" icon={FolderInput} disabled={!ids.length} onClick={() => moveTo(ids)}>Move to folder</Btn>
               <Btn className="sm ghost danger" icon={Trash2} disabled={!ids.length} onClick={() => removeMany(ids)}>Delete</Btn>
             </div>
           )}
-          {!items ? (list.error ? <Empty icon={CloudOff} title="Could not load the media library" text={list.error} action={<Btn icon={RotateCw} onClick={() => list.reload()}>Try again</Btn>} /> : <Loading />) : items.length === 0 ? <Empty icon={folder ? Folder : Sparkles} title={folder ? 'Nothing in here yet' : 'Nothing created yet'} text={folder ? 'Mark pictures as favourites or move them into a folder.' : 'Describe the first picture above – it shows up here.'} /> : (
+          {!items ? (list.error ? <Empty icon={CloudOff} title="Could not load the media library" text={list.error} action={<Btn icon={RotateCw} onClick={() => list.reload()}>Try again</Btn>} /> : <Loading />) : items.length === 0 ? (q.trim() || kind ? <Empty icon={Search} title="No matches" text="Nothing fits the search or filter – try other words or show all." /> : <Empty icon={folder ? Folder : Sparkles} title={folder ? 'Nothing in here yet' : 'Nothing created yet'} text={folder ? 'Mark pictures as favourites or move them into a folder.' : 'Describe the first picture above – it shows up here.'} />) : (
             <div className="media-grid">
               {items.map((m, i) => (
                 <div key={m.id} className={`ams-card ${picked && picked.has(m.id) ? 'is-picked' : ''}`}>
@@ -313,7 +343,9 @@ export function StudioPage() {
         </div>
       </div>
       </div>
-      {sel && <Preview m={sel} lib={lib} onFav={fav} onClose={() => setSel(null)} onDeleted={(gone) => { setSel(null); list.reload(); post('/ai-media/library/forget', { ids: gone }).then((l) => libApi.setData(l)).catch(() => {}); }} onUse={(m) => { setFrom(m); setSel(null); window.scrollTo({ top: 0, behavior: 'smooth' }); const c = document.querySelector('.ams-left'); if (c) c.scrollTo({ top: 0, behavior: 'smooth' }); }} />}
+      {sel && <Preview m={sel} lib={lib} onFav={fav} onClose={() => setSel(null)}
+        onAgain={s.available && sel.prompt && s[sel.kind] && s[sel.kind].ready ? (m) => { setSel(null); if (composer.current) composer.current.again(m); } : null}
+        againPrice={s[sel.kind] && s[sel.kind].ready ? (s[sel.kind].estimate ? euro(sel.kind === 'video' && s[sel.kind].perSecond ? s[sel.kind].perSecond * (s[sel.kind].seconds || 8) : s[sel.kind].estimate) : t('free')) : null} onDeleted={(gone) => { setSel(null); list.reload(); post('/ai-media/library/forget', { ids: gone }).then((l) => libApi.setData(l)).catch(() => {}); }} onUse={(m) => { setFrom(m); setSel(null); window.scrollTo({ top: 0, behavior: 'smooth' }); const c = document.querySelector('.ams-left'); if (c) c.scrollTo({ top: 0, behavior: 'smooth' }); }} />}
     </div>
   );
 }

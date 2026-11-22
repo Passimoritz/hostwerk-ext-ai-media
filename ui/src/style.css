@@ -12,6 +12,7 @@
 .ams-model { display: inline-flex; align-items: center; gap: var(--sp-2); }
 .ams-gap { margin-left: var(--sp-2); }
 .ams-from { display: flex; align-items: center; gap: var(--sp-3); padding: var(--sp-2); border: 1px dashed var(--accent); border-radius: var(--r-xl); background: var(--accent-soft); }
+.ams-from-no { color: var(--err-text); }
 .ams-from img { width: 56px; height: 56px; object-fit: cover; border-radius: var(--r-md); flex: none; }
 .ams-options { gap: var(--sp-3); flex-wrap: wrap; align-items: center; }
 .ams-secs { width: 70px; }
@@ -27,6 +28,11 @@
 .ams-libbar, .ams-pickbar { flex-wrap: wrap; gap: var(--sp-2); }
 .ams-pickbar { padding: var(--sp-2) var(--sp-3); border-radius: var(--r-md); background: var(--accent-soft); }
 .ams-card { position: relative; }
+/* Knopf füllt die Rasterzelle (wie Hostwerks .media-cell) – sonst bleibt die Kachel schmal, bis das Bild geladen ist */
+.ams-card > .media-card { display: block; width: 100%; }
+/* Preis in einer Zeile („≈ 0,05 €“), lange Ordnernamen kürzt die Beschriftung links */
+.ams-card .media-meta > .tiny { flex: none; white-space: nowrap; }
+.ams-card .media-meta > .ellipsis { min-width: 0; }
 .ams-card.is-picked .media-card { outline: 2px solid var(--accent); outline-offset: 2px; }
 .ams-thumb { width: 100%; height: 100%; }
 .ams-fav { position: absolute; top: var(--sp-2); left: var(--sp-2); color: var(--warn); fill: currentColor; pointer-events: none; }

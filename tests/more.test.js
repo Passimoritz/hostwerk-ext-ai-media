@@ -65,6 +65,24 @@ test('recent descriptions and own templates', async () => {
   assert.deepStrictEqual(w.studio.forgetRecent('second idea').recent, ['first idea']);
   const p = w.studio.setTemplates([{ name: 'Product', prompt: 'white background, soft light', kind: 'image' }, { name: '', prompt: 'x' }, { name: 'Clip', prompt: 'slow pan', kind: 'video' }]);
   assert.deepStrictEqual(p.templates.map((x) => `${x.kind}:${x.name}`), ['image:Product', 'video:Clip']);
+  // Gleicher Name: nur einmal, der zuletzt genannte gilt
+  const d = w.studio.setTemplates([{ name: 'Same', prompt: 'old text', kind: 'image' }, { name: 'Other', prompt: 'other text' }, { name: 'Same', prompt: 'new text', kind: 'image' }]);
+  assert.deepStrictEqual(d.templates.map((x) => `${x.name}:${x.prompt}`), ['Other:other text', 'Same:new text']);
+  // Voll (40): die neu angehängte Vorlage bleibt, die älteste fällt weg
+  const many = Array.from({ length: 40 }, (_, i) => ({ name: `T${i}`, prompt: 'some text', kind: 'image' }));
+  const f = w.studio.setTemplates([...many, { name: 'Newest', prompt: 'just saved', kind: 'image' }]).templates;
+  assert.strictEqual(f.length, 40); assert.strictEqual(f[39].name, 'Newest'); assert.strictEqual(f[0].name, 'T1');
+});
+
+test('only text counts as a description; cancelling reaches the generator', async () => {
+  const w = world();
+  assert.throws(() => w.studio.create({ kind: 'image', prompt: { a: 'cat on a roof' } }), /describe/);
+  let seen = null;
+  w.studio.gen = () => ({ estimate: () => 0, generateImage: async (c, p, o) => { seen = o.signal; return { buf: Buffer.from('png'), type: 'image/png' }; } });
+  const ctl = new AbortController();
+  w.studio.host.core = () => ({ runJob: (title, fn) => ({ id: 'j', promise: fn({ progress: () => {}, log: () => {}, signal: ctl.signal }) }) });
+  await w.studio.create({ kind: 'image', prompt: 'a lighthouse' }).promise;
+  assert.strictEqual(seen, ctl.signal);
 });
 
 test('media library order: favourites and folders, several at once, forgotten when deleted', () => {
@@ -77,6 +95,10 @@ test('media library order: favourites and folders, several at once, forgotten wh
   assert.deepStrictEqual(l.folder, { b: 'Logos' });
   l = w.studio.forget(['b']);
   assert.deepStrictEqual([l.fav, l.folder], [{ a: true }, {}]);
+  // Keine Text-IDs: nichts merken (kein „null“/„1“), Text statt Liste wirft nicht
+  l = w.studio.setLibrary({ ids: [null, 1, {}], fav: true });
+  assert.deepStrictEqual(l.fav, { a: true });
+  assert.deepStrictEqual(w.studio.forget('a').fav, { a: true });
 });
 
 test('save into a project: original, favicon 64×64, link preview 1200×630, asks before replacing', () => {
@@ -89,4 +111,25 @@ test('save into a project: original, favicon 64×64, link preview 1200×630, ask
   assert.deepStrictEqual(w.studio.toProject({ project: 'p1', kind: 'favicon', png: png(64, 64) }), { exists: true, file: 'public/favicon.png' });
   assert.ok(w.studio.toProject({ project: 'p1', kind: 'favicon', png: png(64, 64), overwrite: true }).ok);
   assert.strictEqual(w.studio.toProject({ project: 'p1', kind: 'preview', png: png(1200, 630) }).file, 'public/og-image.png');
+});
+
+test('folders: rename moves every piece, dissolve keeps the pieces without folder, unknown folder 404', () => {
+  const w = world();
+  w.studio.setLibrary({ ids: ['a', 'b'], folder: 'Logos' });
+  w.studio.setLibrary({ ids: ['c'], folder: 'Fotos' });
+  let l = w.studio.renameFolder({ from: 'Logos', to: '  Marken  ' });
+  assert.deepStrictEqual(l.folder, { a: 'Marken', b: 'Marken', c: 'Fotos' });
+  l = w.studio.renameFolder({ from: 'Marken', to: null });
+  assert.deepStrictEqual(l.folder, { c: 'Fotos' });
+  assert.throws(() => w.studio.renameFolder({ from: 'gibt-es-nicht', to: 'x' }), (e) => e.status === 404);
+  assert.throws(() => w.studio.renameFolder({ from: '' }), (e) => e.status === 400);
+});
+
+test('sandboxed without data folder: saving says so (503) instead of reporting success; recent descriptions are just not kept', () => {
+  const { Studio: S } = require('../server/studio');
+  const studio = new S({ ctx: {}, t: (s) => s });
+  assert.throws(() => studio.setLibrary({ ids: ['a'], fav: true }), (e) => e.status === 503 && /sandboxed/.test(e.message));
+  assert.throws(() => studio.setTemplates([{ name: 'x', prompt: 'abc' }]), (e) => e.status === 503);
+  assert.doesNotThrow(() => studio.remember('ein Bild'));
+  assert.deepStrictEqual(studio.library(), { fav: {}, folder: {} });
 });

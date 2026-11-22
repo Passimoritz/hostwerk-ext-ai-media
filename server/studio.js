@@ -16,17 +16,20 @@ const ASPECTS = ['16:9', '9:16', '1:1'];
 const MAX_VARIANTS = 4;
 const MAX_RECENT = 20;
 const MAX_TEMPLATES = 40;
+// Nur echte Medien-IDs (Text) – sonst landeten null/1 als „null“/„1“ in den Favoriten, und ids: "abc" brach mit 400 ab
+const cleanIds = (ids) => (Array.isArray(ids) ? ids : []).filter((x) => typeof x === 'string' && /^[\w-]{1,80}$/.test(x)).slice(0, 500);
 
 class Studio {
   constructor(host) {
     this.host = host;
-    this.ctx = host.ctx;
+    this.ctx = host.ctx || {}; // abgeschottet (Entwickler-Modus) gibt es kein ctx – dann „KI-Helfer nicht verfügbar“ statt Absturz
     this.T = (s, v) => host.t(s, v);
     this.dir = this.ctx.paths && this.ctx.paths.data ? path.join(this.ctx.paths.data, 'ai-media') : null;
   }
   /** Own small files: descriptions (recent, templates) and the order of the media library (favourites, folders). */
   read(name, d) { if (!this.dir) return d; try { return JSON.parse(fs.readFileSync(path.join(this.dir, `${name}.json`), 'utf8')); } catch { return d; } }
-  write(name, v) { if (!this.dir) return; fs.mkdirSync(this.dir, { recursive: true }); const p = path.join(this.dir, `${name}.json`); fs.writeFileSync(`${p}.tmp`, JSON.stringify(v)); fs.renameSync(`${p}.tmp`, p); }
+  // Ohne Datenordner (abgeschottet im Entwickler-Modus) nicht still „gespeichert“ melden, sondern sagen, dass es nicht geht
+  write(name, v) { if (!this.dir) throw Object.assign(new Error(this.T('Nothing can be saved here – the extension runs sandboxed without a data folder.')), { status: 503 }); fs.mkdirSync(this.dir, { recursive: true }); const p = path.join(this.dir, `${name}.json`); fs.writeFileSync(`${p}.tmp`, JSON.stringify(v)); fs.renameSync(`${p}.tmp`, p); }
   ai() { if (!this.ctx.ai || !this.ctx.ai.genConfig) throw Object.assign(new Error(this.T('The AI helper is not available.')), { status: 503 }); return this.ctx.ai; }
   gen() { return this.host.service('ai/gen'); }
 
@@ -50,7 +53,7 @@ class Studio {
   create({ kind = 'image', prompt = '', size, seconds, aspect, from = null, variants = 1 } = {}) {
     const T = this.T;
     if (!KINDS[kind]) throw Object.assign(new Error(T('Choose image or video.')), { status: 400 });
-    const text = String(prompt || '').trim().slice(0, 4000);
+    const text = (typeof prompt === 'string' ? prompt : '').trim().slice(0, 4000);
     if (text.length < 3) throw Object.assign(new Error(T('Please describe what it should show.')), { status: 400 });
     const ai = this.ai();
     const c = ai.genConfig(KINDS[kind]);
@@ -75,9 +78,10 @@ class Studio {
     const title = kind === 'video' ? T('Create video ({label})', { label: c.label }) : T('Create image ({label})', { label: c.label });
     return this.host.core('jobs').runJob(title, async (job) => {
       job.progress(5, kind === 'video' ? T('Video is being created – this can take a few minutes …') : T('Image is being created …'));
+      // signal: „Abbrechen“ hält auch Hostwerks lokale Bild-/Video-KI an (sonst rechnet sie im Hintergrund weiter)
       const run = kind === 'video'
-        ? (cc) => gen.generateVideo(cc, text, { seconds: secs, aspect: aspect || c.aspect || '16:9', image: source || undefined, onStatus: (s) => job.log(String(s)) })
-        : (cc) => gen.generateImage(cc, text, { size: size || c.size || '1024x1024', images: source ? [source] : undefined });
+        ? (cc) => gen.generateVideo(cc, text, { seconds: secs, aspect: aspect || c.aspect || '16:9', image: source || undefined, signal: job.signal, onStatus: (s) => job.log(String(s)) })
+        : (cc) => gen.generateImage(cc, text, { size: size || c.size || '1024x1024', images: source ? [source] : undefined, signal: job.signal });
       const ids = [];
       for (let i = 0; i < n; i++) {
         if (n > 1) job.progress(5 + Math.round((i / n) * 90), T('Variant {i} of {n} …', { i: i + 1, n }));
@@ -95,13 +99,17 @@ class Studio {
   /* ---------------- Descriptions: recent ones and own templates ---------------- */
 
   remember(text) {
+    if (!this.dir) return; // Verlauf ist nur Komfort – ohne Datenordner einfach nicht merken
     const p = this.read('prompts', { recent: [], templates: [] });
     p.recent = [text, ...(p.recent || []).filter((x) => x !== text)].slice(0, MAX_RECENT);
     this.write('prompts', p);
   }
   prompts() { const p = this.read('prompts', { recent: [], templates: [] }); return { recent: p.recent || [], templates: p.templates || [] }; }
   setTemplates(list) {
-    const clean = (Array.isArray(list) ? list : []).map((x) => ({ name: String((x && x.name) || '').trim().slice(0, 60), prompt: String((x && x.prompt) || '').trim().slice(0, 4000), kind: x && x.kind === 'video' ? 'video' : 'image' })).filter((x) => x.name && x.prompt.length > 2).slice(0, MAX_TEMPLATES);
+    const clean = (Array.isArray(list) ? list : []).map((x) => ({ name: String((x && x.name) || '').trim().slice(0, 60), prompt: String((x && x.prompt) || '').trim().slice(0, 4000), kind: x && x.kind === 'video' ? 'video' : 'image' })).filter((x) => x.name && x.prompt.length > 2)
+      // Ein Name nur einmal (der zuletzt genannte gilt) – die Seite nutzt ihn als Schlüssel
+      // Neue Vorlagen kommen hinten dazu: bei zu vielen die ältesten weglassen, nicht die gerade gespeicherte
+      .filter((x, i, all) => !all.slice(i + 1).some((y) => y.name === x.name)).slice(-MAX_TEMPLATES);
     const p = this.read('prompts', { recent: [], templates: [] });
     p.templates = clean;
     this.write('prompts', p);
@@ -115,15 +123,27 @@ class Studio {
   /** { ids: [...], fav?: bool, folder?: string|null } – several at once (multi-select). */
   setLibrary({ ids = [], fav, folder } = {}) {
     const l = this.library();
-    for (const id of (Array.isArray(ids) ? ids : []).map(String).filter((x) => /^[\w-]{1,80}$/.test(x)).slice(0, 500)) {
+    for (const id of cleanIds(ids)) {
       if (fav === true) l.fav[id] = true; else if (fav === false) delete l.fav[id];
       if (typeof folder === 'string' && folder.trim()) l.folder[id] = folder.trim().slice(0, 40); else if (folder === null || folder === '') delete l.folder[id];
     }
     this.write('library', l);
     return l;
   }
+  /** Ordner umbenennen (to = neuer Name) oder auflösen (to leer/null: die Stücke bleiben, nur ohne Ordner). */
+  renameFolder({ from, to = null } = {}) {
+    const old = String(from || '').trim();
+    if (!old) throw Object.assign(new Error(this.T('Which folder?')), { status: 400 });
+    const next = typeof to === 'string' ? to.trim().slice(0, 40) : '';
+    const l = this.library();
+    let n = 0;
+    for (const [id, f] of Object.entries(l.folder)) if (f === old) { if (next) l.folder[id] = next; else delete l.folder[id]; n++; }
+    if (!n) throw Object.assign(new Error(this.T('Folder not found')), { status: 404 });
+    this.write('library', l);
+    return l;
+  }
   /** Deleted media leave the order too. */
-  forget(ids) { const l = this.library(); for (const id of ids) { delete l.fav[id]; delete l.folder[id]; } this.write('library', l); return l; }
+  forget(ids) { const l = this.library(); for (const id of cleanIds(ids)) { delete l.fav[id]; delete l.folder[id]; } this.write('library', l); return l; }
 
   /* ---------------- Into a project: original, favicon (64×64) or preview picture (1200×630) ---------------- */
 
@@ -159,7 +179,8 @@ class Studio {
     r.delete('/ai-media/prompts/recent', (req, res) => res.json(this.forgetRecent(String((req.body || {}).text || ''))));
     r.get('/ai-media/library', (req, res) => res.json(this.library()));
     r.put('/ai-media/library', (req, res) => res.json(this.setLibrary(req.body || {})));
-    r.post('/ai-media/library/forget', (req, res) => res.json(this.forget(((req.body || {}).ids || []).map(String))));
+    r.post('/ai-media/library/forget', (req, res) => res.json(this.forget((req.body || {}).ids)));
+    r.post('/ai-media/library/folder', (req, res) => res.json(this.renameFolder(req.body || {})));
     r.post('/ai-media/to-project', (req, res) => res.json(this.toProject(req.body || {})));
   }
 }
